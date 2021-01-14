@@ -1455,11 +1455,11 @@ private:
 	float oldActualTemperature, oldTargetTemperature;
 
 	int encodeTemperature(float t) {
-    	return((int)(t * getTemperatureFactor() + 33.0f));
+    	return((int)(t * getTemperatureFactor() + 32.0f));
     }
 	
 	float decodeTemperature(float t) {
-		return((t - 33.0f) / getTemperatureFactor());
+		return((t - 32.0f) / getTemperatureFactor());
     }
 	
     int getIndex(unsigned char c) {
