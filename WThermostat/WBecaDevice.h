@@ -145,7 +145,7 @@ TODO
 #define STATE_COMPLETE 5
 #define PIN_STATE_HEATING_RELAY 5
 #define PIN_STATE_COOLING_RELAY 4
-#define ECOMODETEMP 20.0
+#define ECOMODETEMP 17.0
 #define ECOMODETEMP_COOL 26.0
 // tuya doc says local time seconds is from 0 to 15 but this seems to be not right
 // for beca
@@ -1876,9 +1876,13 @@ private:
 		network->log()->trace(PSTR("Got new targetTemperature"));
 		bool force=false;
 		if (schedulesMode->equalsString(SCHEDULES_MODE_AUTO)){
-			network->log()->trace(PSTR("Got new targetTemperature: Switching from Schdule to Manual"));
-			schedulesMode->setSuppressOnChange();
-			schedulesMode->setString(SCHEDULES_MODE_OFF);
+			if (!this->receivingDataFromMcu) {
+                network->log()->trace(PSTR("Got new targetTemperature: Switching from Schdule to Manual"));
+			    schedulesMode->setSuppressOnChange();
+			    schedulesMode->setString(SCHEDULES_MODE_OFF);
+                //schedulesModeToMcu(schedulesMode);
+                //systemModeToMcu(schedulesMode);
+            }
 			force=true;
 		}
 		if (schedulesMode->equalsString(SCHEDULES_MODE_OFF)){
@@ -1887,7 +1891,7 @@ private:
 				targetTemperatureManualMode = this->targetTemperature->getDouble();
 				network->log()->trace((String(PSTR("onChangeTargetTemperature, temp: "))+String(targetTemperatureManualMode)).c_str());
 				targetTemperatureManualModeToMcu();
-				schedulesMode->setString(SCHEDULES_MODE_OFF);
+                //schedulesMode->setString(SCHEDULES_MODE_OFF);
 			} else {
 				network->log()->trace((String(PSTR("setTargetTemperatureNoChange, temp: "))+String(this->targetTemperature->getDouble())).c_str());
 			}
