@@ -87,7 +87,7 @@ const static char MQTT_HASS_AUTODISCOVERY_AIRCO[]         PROGMEM = R"=====(
 "hold_cmd_t":"~/cmnd/things/thermostat/properties/holdState",
 "hold_stat_t":"~/stat/things/thermostat/properties",
 "hold_stat_tpl":"{{value_json.holdState}}",
-"hold_modes":["scheduler","manual","eco"],
+"hold_modes":["scheduler","manual"],
 "pl_on":true,
 "pl_off":false,
 "min_temp":"10",
@@ -536,7 +536,7 @@ public:
 		this->mcuId = new WProperty(PROP_MCUID, nullptr, STRING);
 		this->mcuId->setVisibility(ALL);
 		this->mcuId->setReadOnly(true);
-		this->addProperty(mcuId);
+		//this->addProperty(mcuId);
 
 		network->log()->trace(F("Beca settings page schedule (%d)"), ESP.getMaxFreeBlockSize());
 		// Pages
@@ -1044,7 +1044,7 @@ public:
 			schedules[startAddr + period * 3 + 0] = mm;
 		} else if (key[2] == 't') {
 			//temperature
-			byte tt = (int) (atof(value) * getTemperatureFactor());
+			byte tt = encodeTemperature(atof(value));
 			schedulesChanged = schedulesChanged || (schedules[startAddr + period * 3 + 2] != tt);
 			schedules[startAddr + period * 3 + 2] = tt;
 		}
@@ -1085,7 +1085,7 @@ public:
     		buffer[2] = 'h';
     		json->propertyString(buffer, timeStr);
     		buffer[2] = 't';
-    		json->propertyDouble(buffer, (double) schedules[startAddr + i * 3 + 2]	/ getTemperatureFactor());
+    		json->propertyDouble(buffer, decodeTemperature((double) schedules[startAddr + i * 3 + 2]));
     	}
     	delete[] buffer;
     }
@@ -1199,7 +1199,7 @@ public:
     			//heating:     55 AA 00 06 00 05 66 04 00 01 01
     			//ventilation: 55 AA 00 06 00 05 66 04 00 01 02
     			unsigned char deviceOnCommand[] = { 0x55, 0xAA, 0x00, 0x06, 0x00, 0x05,
-    												0x66, 0x04, 0x00, 0x01, dt};
+    												0x05, 0x04, 0x00, 0x01, dt};
     			commandCharsToSerial(11, deviceOnCommand);
 				updateCurrentSchedulePeriod();
 				updateTargetTemperature();
@@ -1454,6 +1454,14 @@ private:
 
 	float oldActualTemperature, oldTargetTemperature;
 
+	int encodeTemperature(float t) {
+    	return((int)(t * getTemperatureFactor() + 32.0f));
+    }
+	
+	float decodeTemperature(float t) {
+		return((t - 32.0f) / getTemperatureFactor());
+    }
+	
     int getIndex(unsigned char c) {
     	const char HEX_DIGITS[] = { '0', '1', '2', '3', '4', '5', '6', '7', '8',
     			'9', 'a', 'b', 'c', 'd', 'e', 'f' };
@@ -1580,7 +1588,7 @@ private:
 								//target Temperature for manual mode
 								//e.g. 24.5C: 55 aa 01 07 00 08 02 02 00 04 00 00 00 31
 								//                                    LENGT xx xx xx xx (longer values? (for 0.1?)) 
-								newValue = (float) receivedCommand[13] / getTemperatureFactor();
+								newValue = decodeTemperature(receivedCommand[13]);
 								changed = ((changed) || (newChanged=!WProperty::isEqual(targetTemperatureManualMode, newValue, 0.01)));
 								targetTemperatureManualMode = newValue;
 								if (changed) updateTargetTemperature();
@@ -1594,7 +1602,7 @@ private:
 							if (commandLength == 0x08) {
 								//actual Temperature
 								//e.g. 23C: 55 aa 01 07 00 08 03 02 00 04 00 00 00 2e
-								newValue = (float) (int8_t)receivedCommand[13] / getTemperatureFactor();
+								newValue = decodeTemperature((int8_t)receivedCommand[13]);
 								changed = ((changed) || (newChanged=!actualTemperature->equalsDouble(newValue)));
 								actualTemperature->setDouble(newValue);
 								logIncomingCommand("actualTemperature_x03", (newChanged ? LOG_LEVEL_TRACE : LOG_LEVEL_VERBOSE));
@@ -1621,12 +1629,27 @@ private:
 							break;
 						case 0x05:
 							if (commandLength == 0x05) {
-								//ecoMode
-								newB = (receivedCommand[10] == 0x01);
-								changed = ((changed) || (newChanged=(newB != ecoMode->getBoolean())));
-								ecoMode->setBoolean(newB);
-								receivedStates[3] = true;
-								logIncomingCommand("ecoMode_x05", (newChanged ? LOG_LEVEL_TRACE : LOG_LEVEL_VERBOSE));
+								//MODEL_BAC_002_ALW - systemMode
+								//cooling:     55 AA 00 06 00 05 66 04 00 01 00
+								//heating:     55 AA 00 06 00 05 66 04 00 01 01
+								//ventilation: 55 AA 00 06 00 05 66 04 00 01 02
+								//this->thermostatModel->setByte(MODEL_BAC_002_ALW);
+								changed = ((changed) || (newChanged=(receivedCommand[10] != this->getSystemModeAsByte())));
+								if (systemMode != nullptr) {
+									switch (receivedCommand[10]) {
+									case 0x00 :
+										systemMode->setString(SYSTEM_MODE_COOL);
+										break;
+									case 0x01 :
+										systemMode->setString(SYSTEM_MODE_HEAT);
+										break;
+									case 0x02 :
+										systemMode->setString(SYSTEM_MODE_FAN);
+										break;
+									}
+								}
+                                receivedStates[3] = true;
+								logIncomingCommand("systemMode_x05", (newChanged ? LOG_LEVEL_TRACE : LOG_LEVEL_VERBOSE));
 								knownCommand = true;
 							}
 							break;
@@ -1673,34 +1696,12 @@ private:
 							if (commandLength == 0x08) {
 								//MODEL_BHT_002_GBLW - actualFloorTemperature
 								//55 aa 01 07 00 08 66 02 00 04 00 00 00 00
-								newValue = (float) (int8_t)(receivedCommand[13]) / getTemperatureFactor();
+								newValue = (float) decodeTemperature((int8_t)(receivedCommand[13]));
 								if (actualFloorTemperature != nullptr) {
 									changed = ((changed) || (newChanged=!actualFloorTemperature->equalsDouble(newValue)));
 									actualFloorTemperature->setDouble(newValue);
 								}
 								logIncomingCommand("actualFloorTemperature_x66", (newChanged ? LOG_LEVEL_TRACE : LOG_LEVEL_VERBOSE));
-								knownCommand = true;
-							} else if (commandLength == 0x05) {
-								//MODEL_BAC_002_ALW - systemMode
-								//cooling:     55 AA 00 06 00 05 66 04 00 01 00
-								//heating:     55 AA 00 06 00 05 66 04 00 01 01
-								//ventilation: 55 AA 00 06 00 05 66 04 00 01 02
-								//this->thermostatModel->setByte(MODEL_BAC_002_ALW);
-								changed = ((changed) || (newChanged=(receivedCommand[10] != this->getSystemModeAsByte())));
-								if (systemMode != nullptr) {
-									switch (receivedCommand[10]) {
-									case 0x00 :
-										systemMode->setString(SYSTEM_MODE_COOL);
-										break;
-									case 0x01 :
-										systemMode->setString(SYSTEM_MODE_HEAT);
-										break;
-									case 0x02 :
-										systemMode->setString(SYSTEM_MODE_FAN);
-										break;
-									}
-								}
-								logIncomingCommand("systemMode_x66", (newChanged ? LOG_LEVEL_TRACE : LOG_LEVEL_VERBOSE));
 								knownCommand = true;
 							}
 							break;
@@ -1813,7 +1814,7 @@ private:
 			}
 			updateRelaySimulation();
 		} else if ((this->currentSchedulePeriod != -1) && (schedulesMode->equalsString(SCHEDULES_MODE_AUTO))) {
-			double temp = (double) schedules[this->currentSchedulePeriod + 2] / getTemperatureFactor();
+			double temp = decodeTemperature((double) schedules[this->currentSchedulePeriod + 2]);
 			String p = String(currentSchedulePeriod>=36 ? SCHEDULES_DAYS[2] : (currentSchedulePeriod>=18 ? SCHEDULES_DAYS[1] : SCHEDULES_DAYS[0]));
 			p.concat(SCHEDULES_PERIODS[(this->currentSchedulePeriod %18) /3]);
 			network->log()->notice((String(PSTR("We take temperature from period '%s', Schedule temperature is "))+String(temp)).c_str() , p.c_str());
@@ -1898,7 +1899,7 @@ private:
     	if (!this->receivingDataFromMcu) {
     		network->log()->notice((String(F("Set target Temperature (manual mode) to "))+String(targetTemperatureManualMode)).c_str());
     	    //55 AA 00 06 00 08 02 02 00 04 00 00 00 2C
-			byte dt = (byte) (targetTemperatureManualMode * getTemperatureFactor());
+			byte dt = (byte) encodeTemperature(targetTemperatureManualMode);
     	    unsigned char setTemperatureCommand[] = { 0x55, 0xAA, 0x00, 0x06, 0x00, 0x08,
     	    		0x02, 0x02, 0x00, 0x04,
 					0x00, 0x00, 0x00, dt};
