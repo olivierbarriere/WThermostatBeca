@@ -81,9 +81,6 @@ const static char MQTT_HASS_AUTODISCOVERY_AIRCO[]         PROGMEM = R"=====(
 "temp_stat_tpl":"{{value_json.targetTemperature}}",
 "curr_temp_t":"~/stat/things/thermostat/properties",
 "curr_temp_tpl":"{{value_json.temperature}}",
-"fan_mode_cmd_t":"~/cmnd/things/thermostat/properties/fanMode",
-"fan_mode_stat_t":"~/stat/things/thermostat/properties",
-"fan_mode_stat_tpl":"{{value_json.fanMode}}",
 "hold_cmd_t":"~/cmnd/things/thermostat/properties/holdState",
 "hold_stat_t":"~/stat/things/thermostat/properties",
 "hold_stat_tpl":"{{value_json.holdState}}",
@@ -93,7 +90,7 @@ const static char MQTT_HASS_AUTODISCOVERY_AIRCO[]         PROGMEM = R"=====(
 "min_temp":"10",
 "max_temp":"35",
 "temp_step":"%s",
-"modes":["heat","cool","fan_only","off"]
+"modes":["heat","cool","off"]
 }
 )=====";
 const static char MQTT_HASS_AUTODISCOVERY_SENSOR[]         PROGMEM = R"=====(
