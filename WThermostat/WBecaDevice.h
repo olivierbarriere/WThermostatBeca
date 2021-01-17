@@ -1879,6 +1879,7 @@ private:
 			    schedulesMode->setString(SCHEDULES_MODE_OFF);
                 //schedulesModeToMcu(schedulesMode);
                 //systemModeToMcu(schedulesMode);
+                //updateModeAndAction();
             }
 			force=true;
 		}
@@ -1917,6 +1918,7 @@ private:
 		float actual=actualTemperature->getDouble();
 		float target=targetTemperature->getDouble();
 		int dz=deadzoneTemp->getByte();
+        float dz2=(float)dz-0.5; //(float)dz/2.0;
 		bool isHeating=false;
 		bool isCooling=false;
 		if (this->deviceOn->getBoolean()){
@@ -1935,18 +1937,16 @@ private:
 			/*
 			network->log()->notice(F("RelaySimulation: Check Heating %s -> %s / %s -> %s (%s)"),
 			((String)oldActualTemperature).c_str(), ((String)actual).c_str(), 
-			((String)oldTargetTemperature).c_str(), ((String)target).c_str(), ((String)(target-dz)).c_str());
+			((String)oldTargetTemperature).c_str(), ((String)target).c_str(), ((String)(target-dz2)).c_str());
 			*/
 			if (actual>=target){
 				network->log()->notice(F("RelaySimulation: State OFF"));
 				this->state->setString(STATE_OFF);
 				updateModeAndAction();
-			} else if ((actual != oldActualTemperature || target!=oldTargetTemperature) && actual <= (target - dz)){
+			} else if ((actual != oldActualTemperature || target!=oldTargetTemperature) && actual <= (target - dz2)){
 				this->state->setString(STATE_HEATING);
 				network->log()->notice(F("RelaySimulation: State HEATING"));
 				updateModeAndAction();
-			} else {
-				network->log()->notice(F("RelaySimulation: NOOP"));
 			}
 		}
 		if (!isSupportingCoolingRelay() && isCooling){
@@ -1954,7 +1954,7 @@ private:
 				network->log()->notice(F("RelaySimulation: State OFF"));
 				this->state->setString(STATE_OFF);
 				updateModeAndAction();
-			} else if ((actual != oldActualTemperature || target != oldTargetTemperature) && actual >= (target + dz)){
+			} else if ((actual != oldActualTemperature || target != oldTargetTemperature) && actual >= (target + dz2)){
 		
 				if (this->systemMode->equalsString(SYSTEM_MODE_FAN)){
 					this->state->setString(STATE_FAN);
