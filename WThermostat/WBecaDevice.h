@@ -90,7 +90,7 @@ const static char MQTT_HASS_AUTODISCOVERY_AIRCO[]         PROGMEM = R"=====(
 "min_temp":"10",
 "max_temp":"35",
 "temp_step":"%s",
-"modes":["heat","cool","off"]
+"modes":["heat","cool","auto","off"]
 }
 )=====";
 const static char MQTT_HASS_AUTODISCOVERY_SENSOR[]         PROGMEM = R"=====(
@@ -163,11 +163,11 @@ const char* HOLD_STATE_OFF PROGMEM = "off";
 const char* SYSTEM_MODE_NONE PROGMEM = "none";
 const char* SYSTEM_MODE_COOL PROGMEM = "cool";
 const char* SYSTEM_MODE_HEAT PROGMEM = "heat";
-const char* SYSTEM_MODE_FAN PROGMEM = "fan_only";
+const char* SYSTEM_MODE_AUTO PROGMEM = "auto";
 const char* STATE_OFF PROGMEM = "off";
 const char* STATE_HEATING PROGMEM = "heating";
 const char* STATE_COOLING PROGMEM = "cooling";
-const char* STATE_FAN PROGMEM = "fan";
+const char* STATE_AUTO PROGMEM = "auto";
 const char* FAN_MODE_NONE PROGMEM = "none";
 const char* FAN_MODE_AUTO PROGMEM = "auto";
 const char* FAN_MODE_LOW  PROGMEM = "low";
@@ -182,7 +182,7 @@ const char* ACTION_OFF  PROGMEM = "off";
 const char* ACTION_COOLING  PROGMEM = "cooling";
 const char* ACTION_HEATING  PROGMEM = "heating";
 const char* ACTION_IDLE  PROGMEM = "idle";
-const char* ACTION_FAN PROGMEM = "fan";
+const char* ACTION_AUTO PROGMEM = "auto";
 
 const char* ID_THERMOSTAT PROGMEM = "thermostat";
 const char* NAME_THERMOSTAT PROGMEM = "Thermostat";
@@ -451,20 +451,20 @@ public:
         	this->systemMode->setAtType(ATTYPE_MODE);
 			this->systemMode->addEnumString(SYSTEM_MODE_COOL);
         	this->systemMode->addEnumString(SYSTEM_MODE_HEAT);
-        	this->systemMode->addEnumString(SYSTEM_MODE_FAN);
+        	this->systemMode->addEnumString(SYSTEM_MODE_AUTO);
 			this->systemMode->setOnChange(std::bind(&WBecaDevice::systemModeToMcu, this, std::placeholders::_1));
 			this->systemMode->setMqttSendChangedValues(true);
         	this->addProperty(systemMode);
-    		this->fanMode = new WProperty(PROP_FANMODE, TITL_FANMODE, STRING);
-        	this->fanMode->setAtType(ATTYPE_FANMODE);
-        	this->fanMode->addEnumString(FAN_MODE_NONE);
-        	this->fanMode->addEnumString(FAN_MODE_LOW);
-        	this->fanMode->addEnumString(FAN_MODE_MEDIUM);
-			this->fanMode->addEnumString(FAN_MODE_HIGH);
-			this->fanMode->addEnumString(FAN_MODE_AUTO);
-			this->fanMode->setOnChange(std::bind(&WBecaDevice::fanModeToMcu, this, std::placeholders::_1));
-			this->fanMode->setMqttSendChangedValues(true);
-        	this->addProperty(fanMode);
+    		//this->fanMode = new WProperty(PROP_FANMODE, TITL_FANMODE, STRING);
+        	//this->fanMode->setAtType(ATTYPE_FANMODE);
+        	//this->fanMode->addEnumString(FAN_MODE_NONE);
+        	//this->fanMode->addEnumString(FAN_MODE_LOW);
+        	//this->fanMode->addEnumString(FAN_MODE_MEDIUM);
+			//this->fanMode->addEnumString(FAN_MODE_HIGH);
+			//this->fanMode->addEnumString(FAN_MODE_AUTO);
+			//this->fanMode->setOnChange(std::bind(&WBecaDevice::fanModeToMcu, this, std::placeholders::_1));
+			//this->fanMode->setMqttSendChangedValues(true);
+        	//this->addProperty(fanMode);
     	}
 		network->log()->trace(F("Beca settings model done (%d)"), ESP.getMaxFreeBlockSize());
 		/* 
@@ -483,7 +483,7 @@ public:
 		this->mode->addEnumString(MODE_HEAT);
 		if (getThermostatModel() == MODEL_BAC_002_ALW) {
 			this->mode->addEnumString(MODE_COOL);
-    		this->mode->addEnumString(MODE_FAN);
+    		this->mode->addEnumString(MODE_AUTO);
 		}
     	this->mode->setOnChange(std::bind(&WBecaDevice::modeToMcu, this, std::placeholders::_1));
 		this->mode->setOnValueRequest([this](WProperty* p) {updateModeAndAction();});
@@ -498,7 +498,7 @@ public:
 		if (getThermostatModel() == MODEL_BHT_002_GBLW) {
 		} else if (getThermostatModel() == MODEL_BAC_002_ALW) {
 			this->action->addEnumString(ACTION_COOLING);
-			this->action->addEnumString(ACTION_FAN);
+			this->action->addEnumString(ACTION_AUTO);
 		}
 		this->action->setMqttSendChangedValues(true);
 		this->action->setReadOnly(true);
@@ -519,7 +519,7 @@ public:
 		this->state->addEnumString(STATE_HEATING);
 		if (getThermostatModel() == MODEL_BHT_002_GBLW){
 			this->state->addEnumString(STATE_COOLING);
-			this->state->addEnumString(STATE_FAN);
+			this->state->addEnumString(STATE_AUTO);
 		}
 		this->state->setMqttSendChangedValues(true);
 		this->state->setOnValueRequest([this](WProperty* p) {updateModeAndAction();});
@@ -1127,6 +1127,7 @@ public:
     	}
     }
 
+    /*
     String getFanMode() {
         return (fanMode != nullptr ? fanMode->c_str() : FAN_MODE_NONE);
     }
@@ -1165,6 +1166,7 @@ public:
     		}
     	}
     }
+    */
 
     String getSystemMode() {
     	return (systemMode != nullptr ? systemMode->c_str() : SYSTEM_MODE_NONE);
@@ -1176,8 +1178,8 @@ public:
     			return 0x00;
     		} else if (systemMode->equalsString(SYSTEM_MODE_HEAT)) {
     			return 0x01;
-    		} else if (systemMode->equalsString(SYSTEM_MODE_FAN)) {
-    			return 0x02;
+    		} else if (systemMode->equalsString(SYSTEM_MODE_AUTO)) {
+    			return 0x04;
     		} else {
     			return 0xFF;
     		}
@@ -1640,8 +1642,8 @@ private:
 									case 0x01 :
 										systemMode->setString(SYSTEM_MODE_HEAT);
 										break;
-									case 0x02 :
-										systemMode->setString(SYSTEM_MODE_FAN);
+									case 0x04 :
+										systemMode->setString(SYSTEM_MODE_AUTO);
 										break;
 									}
 								}
@@ -1702,7 +1704,7 @@ private:
 								knownCommand = true;
 							}
 							break;
-						case 0x67:
+						/*case 0x67:
 							if (commandLength == 0x05) {
 								//fanSpeed
 								//auto   - 55 aa 01 07 00 05 67 04 00 01 00
@@ -1729,7 +1731,7 @@ private:
 								logIncomingCommand("fanSpeed_x67", (newChanged ? LOG_LEVEL_TRACE : LOG_LEVEL_VERBOSE));
 								knownCommand = true;
 							}
-							break;
+							break;*/
 						}
 						if (knownCommand) {							
 							if (changed) {
@@ -1804,7 +1806,7 @@ private:
 		if (ecoMode->getBoolean()) {
 			targetTemperature->setSuppressOnChange();
 			if (getThermostatModel() == MODEL_BAC_002_ALW &&
-			 (this->systemMode->equalsString(SYSTEM_MODE_COOL) || this->systemMode->equalsString(SYSTEM_MODE_FAN))){
+			 (this->systemMode->equalsString(SYSTEM_MODE_COOL))){
 				targetTemperature->setDouble(ECOMODETEMP_COOL);
 			} else {
 				targetTemperature->setDouble(ECOMODETEMP);
@@ -1918,7 +1920,7 @@ private:
 		float actual=actualTemperature->getDouble();
 		float target=targetTemperature->getDouble();
 		int dz=deadzoneTemp->getByte();
-        float dz2=(float)dz-0.5; //(float)dz/2.0;
+        float dz2=0.5; //(float)dz-0.5; //(float)dz/2.0;
 		bool isHeating=false;
 		bool isCooling=false;
 		if (this->deviceOn->getBoolean()){
@@ -1928,7 +1930,7 @@ private:
 				if (!systemMode) return;
 				if (this->systemMode->equalsString(SYSTEM_MODE_HEAT)){
 					isHeating=true;
-				} else if (this->systemMode->equalsString(SYSTEM_MODE_COOL) || this->systemMode->equalsString(SYSTEM_MODE_FAN)){
+				} else if (this->systemMode->equalsString(SYSTEM_MODE_COOL)){
 					isCooling=true;
 				}
 			}
@@ -1955,14 +1957,8 @@ private:
 				this->state->setString(STATE_OFF);
 				updateModeAndAction();
 			} else if ((actual != oldActualTemperature || target != oldTargetTemperature) && actual >= (target + dz2)){
-		
-				if (this->systemMode->equalsString(SYSTEM_MODE_FAN)){
-					this->state->setString(STATE_FAN);
-					network->log()->notice(F("RelaySimulation: State FAN"));
-				} else {
-					this->state->setString(STATE_COOLING);
-					network->log()->notice(F("RelaySimulation: State COOLING"));
-				}
+				this->state->setString(STATE_COOLING);
+				network->log()->notice(F("RelaySimulation: State COOLING"));
 				updateModeAndAction();
 			}
 		}
@@ -2063,18 +2059,12 @@ private:
 				this->deviceOn->setBoolean(false);
 			} else {
 				this->deviceOn->setBoolean(true);
-				if (this->mode->equalsString(MODE_AUTO)){
-					// not really supported
-					this->schedulesMode->setString(SCHEDULES_MODE_AUTO);
-					this->holdState->setString(HOLD_STATE_SCHEDULER);
-					this->fanMode->setString(FAN_MODE_AUTO);
-					this->systemMode->setString(SYSTEM_MODE_COOL);
-				} else if (this->mode->equalsString(MODE_HEAT)){
+				if (this->mode->equalsString(MODE_HEAT)){
 					this->systemMode->setString(SYSTEM_MODE_HEAT);
 				} else if (this->mode->equalsString(MODE_COOL)){
 					this->systemMode->setString(SYSTEM_MODE_COOL);
-				} else if (this->mode->equalsString(MODE_FAN)){
-					this->systemMode->setString(SYSTEM_MODE_FAN);
+				} else if (this->mode->equalsString(MODE_AUTO)){
+					this->systemMode->setString(SYSTEM_MODE_AUTO);
 				} else {
 					network->log()->warning(F("modeToMcu unknown mode %s"), property->c_str());
 				}
@@ -2097,8 +2087,8 @@ private:
 					this->mode->setString(MODE_HEAT);
 				} else if (this->systemMode->equalsString(SYSTEM_MODE_COOL)){
 					this->mode->setString(MODE_COOL);
-				} else if (this->systemMode->equalsString(SYSTEM_MODE_FAN)){
-					this->mode->setString(MODE_FAN);
+				} else if (this->systemMode->equalsString(SYSTEM_MODE_AUTO)){
+					this->mode->setString(MODE_AUTO);
 				} else {
 					// BUG
 				}
@@ -2114,8 +2104,8 @@ private:
 				this->action->setString(ACTION_HEATING);
 			} else if (this->systemMode->equalsString(SYSTEM_MODE_COOL)){
 				this->action->setString(ACTION_COOLING);
-			} else if (this->systemMode->equalsString(SYSTEM_MODE_FAN)){
-				this->action->setString(ACTION_FAN);
+			} else if (this->systemMode->equalsString(SYSTEM_MODE_AUTO)){
+				this->action->setString(ACTION_AUTO);
 			} 
 		} else if (getThermostatModel() == MODEL_BHT_002_GBLW){
 			if (this->state->equalsString(STATE_OFF)){
@@ -2221,10 +2211,6 @@ private:
 		if (getThermostatModel() == MODEL_BAC_002_ALW){
 			htmlTableRowTitle(page, F("BAC-System Mode:"));
 			page->print(systemMode->c_str());
-			htmlTableRowEnd(page);
-
-			htmlTableRowTitle(page, F("Fan Mode:"));
-			page->print(fanMode->c_str());
 			htmlTableRowEnd(page);
 		}
 
