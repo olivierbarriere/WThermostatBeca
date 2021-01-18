@@ -1919,8 +1919,8 @@ private:
 		if (!actualTemperature || !targetTemperature || !deadzoneTemp) return;
 		float actual=actualTemperature->getDouble();
 		float target=targetTemperature->getDouble();
-		int dz=deadzoneTemp->getByte();
-        float dz2=0.5; //(float)dz-0.5; //(float)dz/2.0;
+        //int dz=deadzoneTemp->getByte();
+        float dz=0.5; //Bug in BHP8000 firmware, deadzone parameter not applied
 		bool isHeating=false;
 		bool isCooling=false;
 		if (this->deviceOn->getBoolean()){
@@ -1939,13 +1939,13 @@ private:
 			/*
 			network->log()->notice(F("RelaySimulation: Check Heating %s -> %s / %s -> %s (%s)"),
 			((String)oldActualTemperature).c_str(), ((String)actual).c_str(), 
-			((String)oldTargetTemperature).c_str(), ((String)target).c_str(), ((String)(target-dz2)).c_str());
+			((String)oldTargetTemperature).c_str(), ((String)target).c_str(), ((String)(target-dz)).c_str());
 			*/
 			if (actual>=target){
 				network->log()->notice(F("RelaySimulation: State OFF"));
 				this->state->setString(STATE_OFF);
 				updateModeAndAction();
-			} else if ((actual != oldActualTemperature || target!=oldTargetTemperature) && actual <= (target - dz2)){
+			} else if ((actual != oldActualTemperature || target!=oldTargetTemperature) && actual <= (target - dz)){
 				this->state->setString(STATE_HEATING);
 				network->log()->notice(F("RelaySimulation: State HEATING"));
 				updateModeAndAction();
@@ -1956,7 +1956,7 @@ private:
 				network->log()->notice(F("RelaySimulation: State OFF"));
 				this->state->setString(STATE_OFF);
 				updateModeAndAction();
-			} else if ((actual != oldActualTemperature || target != oldTargetTemperature) && actual >= (target + dz2)){
+			} else if ((actual != oldActualTemperature || target != oldTargetTemperature) && actual >= (target + dz)){
 				this->state->setString(STATE_COOLING);
 				network->log()->notice(F("RelaySimulation: State COOLING"));
 				updateModeAndAction();
